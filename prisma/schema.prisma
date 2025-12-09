@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Vehicle {
+  id           String   @id @default(cuid())
+  vin          String   @unique
+  internalCode String   @unique
+  brand        String
+  model        String
+  color        String
+  year         Int
+  createdAt    DateTime @default(now())
+
+  entries VehicleEntry[]
+}
+
+model Employee {
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  username          String?  @unique
+  passwordHash      String?
+  phone             String
+  role              String   @default("technician")
+  language          String   @default("es")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  completedServices Int      @default(0)
+  locationId        String?
+
+  entries VehicleEntry[]
+  location Location? @relation(fields: [locationId], references: [id])
+
+  @@index([locationId])
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  name      String
+  description String?
+  price     Int
+  duration  Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  entries VehicleEntry[]
+}
+
+model VehicleEntry {
+  id             String   @id @default(cuid())
+  vehicleId      String
+  employeeId     String
+  serviceId      String
+  status         String   @default("pending")
+  arrivalDate    DateTime
+  completionDate DateTime?
+  notes          String?
+  finalNotes     String?
+  createdAt      DateTime @default(now())
+
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id])
+  photos   Photo[]
+  updates  EntryUpdate[]
+
+  @@index([status])
+  @@index([employeeId])
+  @@index([vehicleId])
+  @@index([arrivalDate])
+}
+
+model Photo {
+  id        String       @id @default(cuid())
+  entryId   String
+  updateId  String?
+  type      String
+  url       String
+  createdAt DateTime     @default(now())
+
+  entry  VehicleEntry @relation(fields: [entryId], references: [id])
+  update EntryUpdate? @relation(fields: [updateId], references: [id])
+
+  @@index([entryId])
+  @@index([type])
+  @@index([updateId])
+}
+
+model EntryUpdate {
+  id        String       @id @default(cuid())
+  entryId   String
+  text      String
+  createdAt DateTime     @default(now())
+
+  entry  VehicleEntry @relation(fields: [entryId], references: [id])
+  photos Photo[]
+
+  @@index([entryId])
+}
+
+model Settings {
+  id           String   @id @default(cuid())
+  companyName  String
+  ein          String?
+  address      String?
+  phone        String?
+  email        String?
+  hours        String?
+  logo         String?
+  currency     String   @default("COP")
+  createdAt    DateTime @default(now())
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  city      String?
+  country   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  employees Employee[]
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  models CarModel[]
+}
+
+model CarModel {
+  id        String   @id @default(cuid())
+  brandId   String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  brand Brand @relation(fields: [brandId], references: [id])
+
+  @@index([brandId])
+  @@unique([brandId, name])
+}
