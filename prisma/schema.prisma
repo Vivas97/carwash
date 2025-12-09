@@ -7,146 +7,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Vehicle {
-  id           String   @id @default(cuid())
-  vin          String   @unique
-  internalCode String   @unique
-  brand        String
-  model        String
-  color        String
-  year         Int
-  createdAt    DateTime @default(now())
-
-  entries VehicleEntry[]
+model brand {
+  id        String     @id
+  name      String     @unique(map: "Brand_name_key")
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  carmodel  carmodel[]
 }
 
-model Employee {
-  id                String   @id @default(cuid())
-  name              String
-  email             String   @unique
-  username          String?  @unique
-  passwordHash      String?
-  phone             String
-  role              String   @default("technician")
-  language          String   @default("es")
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  completedServices Int      @default(0)
-  locationId        String?
-
-  entries VehicleEntry[]
-  location Location? @relation(fields: [locationId], references: [id])
-
-  @@index([locationId])
-}
-
-model Service {
-  id        String   @id @default(cuid())
-  name      String
-  description String?
-  price     Int
-  duration  Int
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  entries VehicleEntry[]
-}
-
-model VehicleEntry {
-  id             String   @id @default(cuid())
-  vehicleId      String
-  employeeId     String
-  serviceId      String
-  status         String   @default("pending")
-  arrivalDate    DateTime
-  completionDate DateTime?
-  notes          String?
-  finalNotes     String?
-  createdAt      DateTime @default(now())
-
-  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id])
-  employee Employee @relation(fields: [employeeId], references: [id])
-  service  Service  @relation(fields: [serviceId], references: [id])
-  photos   Photo[]
-  updates  EntryUpdate[]
-
-  @@index([status])
-  @@index([employeeId])
-  @@index([vehicleId])
-  @@index([arrivalDate])
-}
-
-model Photo {
-  id        String       @id @default(cuid())
-  entryId   String
-  updateId  String?
-  type      String
-  url       String
-  createdAt DateTime     @default(now())
-
-  entry  VehicleEntry @relation(fields: [entryId], references: [id])
-  update EntryUpdate? @relation(fields: [updateId], references: [id])
-
-  @@index([entryId])
-  @@index([type])
-  @@index([updateId])
-}
-
-model EntryUpdate {
-  id        String       @id @default(cuid())
-  entryId   String
-  text      String
-  createdAt DateTime     @default(now())
-
-  entry  VehicleEntry @relation(fields: [entryId], references: [id])
-  photos Photo[]
-
-  @@index([entryId])
-}
-
-model Settings {
-  id           String   @id @default(cuid())
-  companyName  String
-  ein          String?
-  address      String?
-  phone        String?
-  email        String?
-  hours        String?
-  logo         String?
-  currency     String   @default("COP")
-  createdAt    DateTime @default(now())
-}
-
-model Location {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  city      String?
-  country   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  employees Employee[]
-}
-
-model Brand {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  models CarModel[]
-}
-
-model CarModel {
-  id        String   @id @default(cuid())
+model carmodel {
+  id        String   @id
   brandId   String
   name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  brand     brand    @relation(fields: [brandId], references: [id], map: "CarModel_brandId_fkey")
 
-  brand Brand @relation(fields: [brandId], references: [id])
+  @@unique([brandId, name], map: "CarModel_brandId_name_key")
+  @@index([brandId], map: "CarModel_brandId_idx")
+}
 
-  @@index([brandId])
-  @@unique([brandId, name])
+model employee {
+  id                String         @id
+  name              String
+  email             String         @unique(map: "Employee_email_key")
+  phone             String
+  role              String         @default("technician")
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  completedServices Int            @default(0)
+  locationId        String?
+  passwordHash      String?
+  username          String?        @unique(map: "Employee_username_key")
+  language          String         @default("es")
+  location          location?      @relation(fields: [locationId], references: [id], map: "Employee_locationId_fkey")
+  vehicleentry      vehicleentry[]
+
+  @@index([locationId], map: "Employee_locationId_idx")
+}
+
+model entryupdate {
+  id           String       @id
+  entryId      String
+  text         String
+  createdAt    DateTime     @default(now())
+  vehicleentry vehicleentry @relation(fields: [entryId], references: [id], map: "EntryUpdate_entryId_fkey")
+  photo        photo[]
+
+  @@index([entryId], map: "EntryUpdate_entryId_idx")
+}
+
+model location {
+  id        String     @id
+  name      String
+  address   String?
+  city      String?
+  country   String?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  employee  employee[]
+}
+
+model photo {
+  id           String       @id
+  entryId      String
+  type         String
+  url          String
+  createdAt    DateTime     @default(now())
+  updateId     String?
+  vehicleentry vehicleentry @relation(fields: [entryId], references: [id], map: "Photo_entryId_fkey")
+  entryupdate  entryupdate? @relation(fields: [updateId], references: [id], map: "Photo_updateId_fkey")
+
+  @@index([entryId], map: "Photo_entryId_idx")
+  @@index([type], map: "Photo_type_idx")
+  @@index([updateId], map: "Photo_updateId_idx")
+}
+
+model service {
+  id           String         @id
+  name         String
+  description  String?
+  price        Int
+  duration     Int
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  vehicleentry vehicleentry[]
+}
+
+model settings {
+  id          String   @id
+  companyName String
+  ein         String?
+  address     String?
+  phone       String?
+  email       String?
+  hours       String?
+  createdAt   DateTime @default(now())
+  logo        String?
+  currency    String   @default("COP")
+}
+
+model vehicle {
+  id           String         @id
+  vin          String         @unique(map: "Vehicle_vin_key")
+  internalCode String         @unique(map: "Vehicle_internalCode_key")
+  brand        String
+  model        String
+  color        String
+  year         Int
+  createdAt    DateTime       @default(now())
+  vehicleentry vehicleentry[]
+}
+
+model vehicleentry {
+  id             String        @id
+  vehicleId      String
+  employeeId     String
+  serviceId      String
+  status         String        @default("pending")
+  arrivalDate    DateTime
+  completionDate DateTime?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  finalNotes     String?
+  entryupdate    entryupdate[]
+  photo          photo[]
+  employee       employee      @relation(fields: [employeeId], references: [id], map: "VehicleEntry_employeeId_fkey")
+  service        service       @relation(fields: [serviceId], references: [id], map: "VehicleEntry_serviceId_fkey")
+  vehicle        vehicle       @relation(fields: [vehicleId], references: [id], map: "VehicleEntry_vehicleId_fkey")
+
+  @@index([arrivalDate], map: "VehicleEntry_arrivalDate_idx")
+  @@index([employeeId], map: "VehicleEntry_employeeId_idx")
+  @@index([serviceId], map: "VehicleEntry_serviceId_fkey")
+  @@index([status], map: "VehicleEntry_status_idx")
+  @@index([vehicleId], map: "VehicleEntry_vehicleId_idx")
 }
