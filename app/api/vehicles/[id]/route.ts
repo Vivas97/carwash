@@ -1,18 +1,48 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import cloudinary from "@/lib/cloudinary"
 
 async function deleteFileIfExists(url: string) {
   try {
     if (typeof url !== 'string' || url.length === 0) return
-    if (!url.startsWith('/uploads/')) return
-    const pathMod = await import('node:path')
-    const fs = await import('node:fs/promises')
-    const rel = url.replace(/^\//, '')
-    const primary = pathMod.join(process.cwd(), rel)
-    const fallback = pathMod.join(process.cwd(), '.next', 'standalone', rel)
-    let filePath = primary
-    try { await fs.access(primary) } catch { filePath = fallback }
-    await fs.unlink(filePath).catch(() => {})
+    // Delete local file
+    if (url.startsWith('/uploads/')) {
+      const pathMod = await import('node:path')
+      const fs = await import('node:fs/promises')
+      const rel = url.replace(/^\//, '')
+      const primary = pathMod.join(process.cwd(), rel)
+      const fallback = pathMod.join(process.cwd(), '.next', 'standalone', rel)
+      let filePath = primary
+      try { await fs.access(primary) } catch { filePath = fallback }
+      await fs.unlink(filePath).catch(() => {})
+      return
+    }
+    // Delete Cloudinary asset by deriving public_id from URL
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        const parsed = new URL(url)
+        const pathname = parsed.pathname
+        const idx = pathname.indexOf('/upload/')
+        if (idx >= 0) {
+          let sub = pathname.slice(idx + '/upload/'.length)
+          const segs = sub.split('/').filter(Boolean)
+          if (segs.length > 0 && /^v\d+$/.test(segs[0])) segs.shift()
+          if (segs.length > 0) {
+            let last = segs.pop() as string
+            const qIndex = last.indexOf('?')
+            if (qIndex >= 0) last = last.slice(0, qIndex)
+            const dot = last.lastIndexOf('.')
+            if (dot >= 0) last = last.slice(0, dot)
+            segs.push(last)
+            const publicId = segs.join('/')
+            if (publicId && publicId.length > 0) {
+              await cloudinary.uploader.destroy(publicId).catch(() => {})
+            }
+          }
+        }
+      } catch {}
+      return
+    }
   } catch {}
 }
 

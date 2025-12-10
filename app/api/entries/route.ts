@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import cloudinary from "@/lib/cloudinary"
 import { cookies } from "next/headers"
 export const runtime = 'nodejs'
 
@@ -9,29 +10,8 @@ async function savePhotoToPublic(raw: string): Promise<string | null> {
   if (raw.startsWith("http://") || raw.startsWith("https://")) return raw
   if (!raw.startsWith("data:")) return null
   try {
-    const parts = raw.split(",")
-    if (parts.length < 2) return null
-    const meta = parts[0] // e.g., data:image/png;base64
-    const base64 = parts[1]
-    const mime = meta.split(":")[1]?.split(";")[0] || "image/png"
-    let ext = mime.split("/")[1] || "png"
-    if (ext === "jpeg") ext = "jpg"
-    const crypto = await import("node:crypto")
-    const path = await import("node:path")
-    const fs = await import("node:fs/promises")
-    const name = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`
-    const primaryDir = path.join(process.cwd(), "public", "uploads")
-    const fallbackStandaloneDir = path.join(process.cwd(), ".next", "standalone", "public", "uploads")
-    let dir = primaryDir
-    try {
-      await fs.access(path.join(process.cwd(), "public"))
-    } catch {
-      dir = fallbackStandaloneDir
-    }
-    await fs.mkdir(dir, { recursive: true })
-    const filePath = path.join(dir, name)
-    await fs.writeFile(filePath, Buffer.from(base64, "base64"))
-    return `/uploads/${name}`
+    const res = await cloudinary.uploader.upload(raw, { folder: "carwash", resource_type: "image" })
+    return res.secure_url || res.url || null
   } catch {
     return null
   }
