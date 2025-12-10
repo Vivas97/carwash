@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Scan, RefreshCcw } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { BrowserMultiFormatReader, NotFoundException, BarcodeFormat, DecodeHintType } from "@zxing/library"
+import { NotFoundException, BarcodeFormat, DecodeHintType, MultiFormatReader, BinaryBitmap, HybridBinarizer, RGBLuminanceSource } from "@zxing/library"
 
 export default function ScannerPage() {
   const { t } = useI18n()
@@ -21,7 +21,8 @@ export default function ScannerPage() {
   const [scanMode, setScanMode] = useState<"vin" | "internal" | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [lastValue, setLastValue] = useState("")
-  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null)
+  const codeReaderRef = useRef<MultiFormatReader | null>(null)
+  const cancelRef = useRef(false)
   const [redirected, setRedirected] = useState(false)
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
@@ -63,72 +64,159 @@ export default function ScannerPage() {
         const hints = new Map()
         hints.set(DecodeHintType.POSSIBLE_FORMATS, formats)
         hints.set(DecodeHintType.TRY_HARDER, true)
-        const reader = new BrowserMultiFormatReader(hints as any)
+        const reader = new MultiFormatReader()
+        reader.setHints(hints as any)
         codeReaderRef.current = reader
-        const devices = await reader.listVideoInputDevices()
-        setAvailableCameras(devices)
+
+        const list = await navigator.mediaDevices.enumerateDevices()
+        const vids = list.filter((d) => d.kind === "videoinput")
+        setAvailableCameras(vids as any)
         let deviceId = selectedDeviceId
         if (!deviceId) {
-          const backCam = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[0]
+          const backCam = vids.find((d) => /back|rear|environment/i.test(d.label)) || vids[0]
           deviceId = backCam?.deviceId || null
           setSelectedDeviceId(deviceId)
         }
         const constraints: any = deviceId
-          ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: 16 / 9 } }
-          : { video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: 16 / 9 } }
-        await reader.decodeFromConstraints(constraints, videoRef.current!, async (result, err) => {
-          if (result && result.getText()) {
-            const value = result.getText().trim()
-            if (!value || value === lastValue) return
-            setLastValue(value)
-            const val = value.toUpperCase()
-            const sanitized = val.replace(/[^A-Z0-9]/g, "")
-            if (scanMode === "vin") {
-              const isVin = sanitized.length === 17
-              if (isVin) {
-                setVinScan(sanitized)
-                if (!redirected) {
-                  setRedirected(true)
-                  continueToForm({ vin: sanitized, internal: "" })
-                }
-              } else {
-                setInternalScan(sanitized)
-                if (!redirected) {
-                  setRedirected(true)
-                  continueToForm({ vin: "", internal: sanitized })
-                }
+          ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }
+          : { video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        const videoEl = videoRef.current!
+        videoEl.setAttribute("playsinline", "true")
+        videoEl.setAttribute("autoplay", "true")
+        videoEl.muted = true
+        ;(videoEl as any).srcObject = stream
+        if (videoEl.readyState >= 2) {
+          await videoEl.play()
+        } else {
+          await new Promise<void>((resolve) => {
+            const onLoaded = () => {
+              videoEl.removeEventListener("loadedmetadata", onLoaded)
+              videoEl.play().then(() => resolve()).catch(() => resolve())
+            }
+            videoEl.addEventListener("loadedmetadata", onLoaded)
+          })
+        }
+
+        const supportedFormats = (typeof (window as any).BarcodeDetector !== "undefined" && (await (window as any).BarcodeDetector.getSupportedFormats?.())) || []
+        const useDetector = Array.isArray(supportedFormats) && supportedFormats.length > 0
+        const detector = useDetector ? new (window as any).BarcodeDetector({ formats: supportedFormats }) : null
+
+        const canvas = document.createElement("canvas")
+        const ctx = canvas.getContext("2d")!
+        cancelRef.current = false
+
+        const handleValue = (valueRaw: string) => {
+          const value = String(valueRaw || "").trim()
+          if (!value || value === lastValue) return
+          setLastValue(value)
+          const val = value.toUpperCase()
+          const sanitized = val.replace(/[^A-Z0-9]/g, "")
+          if (scanMode === "vin") {
+            const isVin = sanitized.length === 17
+            if (isVin) {
+              setVinScan(sanitized)
+              if (!redirected) {
+                setRedirected(true)
+                continueToForm({ vin: sanitized, internal: "" })
               }
-            } else if (scanMode === "internal") {
+            } else {
+              setInternalScan(sanitized)
+              if (!redirected) {
+                setRedirected(true)
+                continueToForm({ vin: "", internal: sanitized })
+              }
+            }
+          } else if (scanMode === "internal") {
+            setInternalScan(sanitized)
+            if (!redirected) {
+              setRedirected(true)
+              continueToForm({ vin: vinScan, internal: sanitized })
+            }
+          } else {
+            const looksLikeVin = sanitized.length >= 17
+            if (looksLikeVin) {
+              setVinScan(sanitized)
+              if (!redirected) {
+                setRedirected(true)
+                continueToForm({ vin: sanitized, internal: "" })
+              }
+            } else {
               setInternalScan(sanitized)
               if (!redirected) {
                 setRedirected(true)
                 continueToForm({ vin: vinScan, internal: sanitized })
               }
-            } else {
-              const looksLikeVin = sanitized.length >= 17
-              if (looksLikeVin) {
-                setVinScan(sanitized)
-                if (!redirected) {
-                  setRedirected(true)
-                  continueToForm({ vin: sanitized, internal: "" })
-                }
-              } else {
-                setInternalScan(sanitized)
-                if (!redirected) {
-                  setRedirected(true)
-                  continueToForm({ vin: vinScan, internal: sanitized })
-                }
-              }
             }
-          } else if (err && !(err instanceof NotFoundException)) {
-            
           }
-        })
+        }
+
+        const decodeZXing = () => {
+          const vw = videoEl.videoWidth || 1280
+          const vh = videoEl.videoHeight || 720
+          if (!vw || !vh) return null
+          canvas.width = vw
+          canvas.height = vh
+          ctx.drawImage(videoEl, 0, 0, vw, vh)
+          const img = ctx.getImageData(0, 0, vw, vh)
+          const luminances = new Uint8ClampedArray(vw * vh)
+          for (let i = 0, p = 0; i < luminances.length; i++, p += 4) {
+            const r = img.data[p]
+            const g = img.data[p + 1]
+            const b = img.data[p + 2]
+            luminances[i] = Math.min(255, (0.2126 * r + 0.7152 * g + 0.0722 * b) | 0)
+          }
+          const src = new RGBLuminanceSource(luminances, vw, vh)
+          const tryDecode = (source: any) => {
+            try {
+              const bmp = new BinaryBitmap(new HybridBinarizer(source))
+              const res = codeReaderRef.current!.decode(bmp)
+              return res?.getText?.() || null
+            } catch {
+              return null
+            }
+          }
+          let out = tryDecode(src)
+          if (!out && src.isRotateSupported()) {
+            out = tryDecode(src.rotateCounterClockwise())
+          }
+          if (!out && src.isRotateSupported()) {
+            out = tryDecode(src.rotateCounterClockwise().rotateCounterClockwise())
+          }
+          if (!out) {
+            out = tryDecode(src.invert())
+          }
+          return out
+        }
+
+        const tick = async () => {
+          if (cancelRef.current || !isScanning) return
+          try {
+            if (detector) {
+              const ds = await detector.detect(videoEl)
+              if (ds && ds.length > 0) {
+                const first = ds[0]
+                handleValue(String(first.rawValue || ""))
+              } else {
+                const val = decodeZXing()
+                if (val) handleValue(val)
+              }
+            } else {
+              const val = decodeZXing()
+              if (val) handleValue(val)
+            }
+          } catch {}
+          if (!cancelRef.current && isScanning) requestAnimationFrame(tick)
+        }
+
+        requestAnimationFrame(tick)
       } catch {}
     }
     if (isScanning) start()
     return () => {
       try {
+        cancelRef.current = true
         codeReaderRef.current?.reset()
         const s: MediaStream | undefined = (videoRef.current as any)?.srcObject
         s?.getTracks?.().forEach((t) => t.stop())
