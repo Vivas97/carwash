@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { cookies } from "next/headers"
+export const runtime = 'nodejs'
 
 async function savePhotoToPublic(raw: string): Promise<string | null> {
   if (typeof raw !== "string" || raw.length === 0) return null
@@ -63,7 +64,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const body = await req.json()
+  let body: any = {}
+  try { body = await req.json() } catch {}
   const { vehicleId: vehicleIdRaw, vehicle: vehicleRaw, employeeId: employeeIdInput, serviceId, status = "pending", arrivalDate, notes, initialPhotos = [] } = body || {}
   let vehicleId = vehicleIdRaw as string | undefined
   let employeeId = typeof employeeIdInput === "string" && employeeIdInput.length > 0 ? employeeIdInput : undefined

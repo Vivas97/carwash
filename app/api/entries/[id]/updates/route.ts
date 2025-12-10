@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+export const runtime = 'nodejs'
 
 async function savePhotoToPublic(raw: string): Promise<string | null> {
   if (typeof raw !== "string" || raw.length === 0) return null
@@ -38,7 +39,8 @@ async function savePhotoToPublic(raw: string): Promise<string | null> {
 export async function POST(req: Request, context: any) {
   const { params } = await context
   const { id } = await params
-  const body = await req.json()
+  let body: any = {}
+  try { body = await req.json() } catch {}
   const { text, photos = [] } = body || {}
   if (!text) return NextResponse.json({ error: "Texto requerido" }, { status: 400 })
   if (!id || typeof id !== 'string') return NextResponse.json({ error: "ID de entrada requerido" }, { status: 400 })

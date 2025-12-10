@@ -28,11 +28,19 @@ export default function ScannerPage() {
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null)
 
   const continueToForm = useCallback((opts?: { vin?: string; internal?: string }) => {
-    const vParam = (opts?.vin ?? vinScan) ? encodeURIComponent(opts?.vin ?? vinScan) : ""
-    const cParam = (opts?.internal ?? internalScan) ? encodeURIComponent(opts?.internal ?? internalScan) : ""
+    const vRaw = (opts?.vin ?? vinScan) || ""
+    const cRaw = (opts?.internal ?? internalScan) || ""
+    const vParam = vRaw.length === 17 ? encodeURIComponent(vRaw) : ""
+    const cParam = cRaw.length > 0 ? encodeURIComponent(cRaw) : ""
     const query = `?v=${vParam}&c=${cParam}`
+    setIsScanning(false)
+    setRedirected(true)
     try {
       codeReaderRef.current?.reset()
+    } catch {}
+    try {
+      const s: MediaStream | undefined = (videoRef.current as any)?.srcObject
+      s?.getTracks?.().forEach((t) => t.stop())
     } catch {}
     router.push(`/create-order${query}`)
   }, [vinScan, internalScan, router])
@@ -76,10 +84,19 @@ export default function ScannerPage() {
             const val = value.toUpperCase()
             const sanitized = val.replace(/[^A-Z0-9]/g, "")
             if (scanMode === "vin") {
-              setVinScan(sanitized)
-              if (!redirected) {
-                setRedirected(true)
-                continueToForm({ vin: sanitized, internal: "" })
+              const isVin = sanitized.length === 17
+              if (isVin) {
+                setVinScan(sanitized)
+                if (!redirected) {
+                  setRedirected(true)
+                  continueToForm({ vin: sanitized, internal: "" })
+                }
+              } else {
+                setInternalScan(sanitized)
+                if (!redirected) {
+                  setRedirected(true)
+                  continueToForm({ vin: "", internal: sanitized })
+                }
               }
             } else if (scanMode === "internal") {
               setInternalScan(sanitized)
@@ -113,6 +130,8 @@ export default function ScannerPage() {
     return () => {
       try {
         codeReaderRef.current?.reset()
+        const s: MediaStream | undefined = (videoRef.current as any)?.srcObject
+        s?.getTracks?.().forEach((t) => t.stop())
       } catch {}
     }
   }, [isScanning, lastValue, vinScan, internalScan, continueToForm, redirected, scanMode, selectedDeviceId])

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-  const body = await req.json()
+  let body: any = {}
+  try { body = await req.json() } catch {}
   const { username, password } = body || {}
   if (!username || !password) return NextResponse.json({ error: "Credenciales requeridas" }, { status: 400 })
   let user = await prisma.employee.findUnique({ where: { username } })

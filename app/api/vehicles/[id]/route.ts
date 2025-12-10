@@ -16,15 +16,19 @@ async function deleteFileIfExists(url: string) {
   } catch {}
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function GET(_req: Request, { params }: { params?: { id?: string } }) {
+  const url = new URL(_req.url)
+  const id = params?.id || url.pathname.split('/').pop() || undefined
+  if (!id) return NextResponse.json({ error: "Identificador requerido" }, { status: 400 })
   const vehicle = await prisma.vehicle.findUnique({ where: { id } })
   if (!vehicle) return NextResponse.json({ error: "No encontrado" }, { status: 404 })
   return NextResponse.json(vehicle)
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function DELETE(_req: Request, { params }: { params?: { id?: string } }) {
+  const url = new URL(_req.url)
+  const id = params?.id || url.pathname.split('/').pop() || undefined
+  if (!id) return NextResponse.json({ error: "Identificador requerido" }, { status: 400 })
   const entries = await prisma.vehicleEntry.findMany({
     where: { vehicleId: id },
     include: { photos: true, updates: { include: { photos: true } } },

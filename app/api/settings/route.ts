@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+export const runtime = 'nodejs'
 
 async function saveLogo(raw: any): Promise<string | null> {
   if (typeof raw !== "string" || raw.length === 0) return null
@@ -42,7 +43,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  const body = await req.json()
+  let body: any = {}
+  try { body = await req.json() } catch {}
   const current = await getOrCreateSettings()
   const data: any = {}
   if (typeof body.companyName === "string") data.companyName = body.companyName

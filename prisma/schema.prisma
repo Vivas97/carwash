@@ -7,28 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model brand {
-  id        String     @id
+model Brand {
+  id        String     @id @default(cuid())
   name      String     @unique(map: "Brand_name_key")
   isActive  Boolean    @default(true)
   createdAt DateTime   @default(now())
-  carmodel  carmodel[]
+  carmodel  CarModel[]
+
+  @@map("brand")
 }
 
-model carmodel {
-  id        String   @id
+model CarModel {
+  id        String   @id @default(cuid())
   brandId   String
   name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
-  brand     brand    @relation(fields: [brandId], references: [id], map: "CarModel_brandId_fkey")
+  brand     Brand    @relation(fields: [brandId], references: [id], map: "CarModel_brandId_fkey")
 
   @@unique([brandId, name], map: "CarModel_brandId_name_key")
   @@index([brandId], map: "CarModel_brandId_idx")
+
+  @@map("carmodel")
 }
 
-model employee {
-  id                String         @id
+model Employee {
+  id                String         @id @default(cuid())
   name              String
   email             String         @unique(map: "Employee_email_key")
   phone             String
@@ -40,62 +44,72 @@ model employee {
   passwordHash      String?
   username          String?        @unique(map: "Employee_username_key")
   language          String         @default("es")
-  location          location?      @relation(fields: [locationId], references: [id], map: "Employee_locationId_fkey")
-  vehicleentry      vehicleentry[]
+  location          Location?      @relation(fields: [locationId], references: [id], map: "Employee_locationId_fkey")
+  vehicleentry      VehicleEntry[]
 
   @@index([locationId], map: "Employee_locationId_idx")
+
+  @@map("employee")
 }
 
-model entryupdate {
-  id           String       @id
+model EntryUpdate {
+  id           String       @id @default(cuid())
   entryId      String
   text         String
   createdAt    DateTime     @default(now())
-  vehicleentry vehicleentry @relation(fields: [entryId], references: [id], map: "EntryUpdate_entryId_fkey")
-  photo        photo[]
+  entry        VehicleEntry @relation(fields: [entryId], references: [id], map: "EntryUpdate_entryId_fkey")
+  photos       Photo[]
 
   @@index([entryId], map: "EntryUpdate_entryId_idx")
+
+  @@map("entryupdate")
 }
 
-model location {
-  id        String     @id
+model Location {
+  id        String     @id @default(cuid())
   name      String
   address   String?
   city      String?
   country   String?
   isActive  Boolean    @default(true)
   createdAt DateTime   @default(now())
-  employee  employee[]
+  employee  Employee[]
+
+  @@map("location")
 }
 
-model photo {
-  id           String       @id
+model Photo {
+  id           String       @id @default(cuid())
   entryId      String
   type         String
   url          String
   createdAt    DateTime     @default(now())
   updateId     String?
-  vehicleentry vehicleentry @relation(fields: [entryId], references: [id], map: "Photo_entryId_fkey")
-  entryupdate  entryupdate? @relation(fields: [updateId], references: [id], map: "Photo_updateId_fkey")
+  entry        VehicleEntry @relation(fields: [entryId], references: [id], map: "Photo_entryId_fkey")
+  update       EntryUpdate? @relation(fields: [updateId], references: [id], map: "Photo_updateId_fkey")
 
   @@index([entryId], map: "Photo_entryId_idx")
   @@index([type], map: "Photo_type_idx")
   @@index([updateId], map: "Photo_updateId_idx")
+
+  @@map("photo")
 }
 
-model service {
-  id           String         @id
+model Service {
+  id           String         @id @default(cuid())
   name         String
   description  String?
   price        Int
   duration     Int
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())
-  vehicleentry vehicleentry[]
+  vehicleentry VehicleEntry[]
+
+  @@map("service")
 }
 
-model settings {
-  id          String   @id
+model Settings {
+  id          String   @id @default(cuid())
   companyName String
   ein         String?
   address     String?
@@ -105,10 +119,12 @@ model settings {
   createdAt   DateTime @default(now())
   logo        String?
   currency    String   @default("COP")
+
+  @@map("settings")
 }
 
-model vehicle {
-  id           String         @id
+model Vehicle {
+  id           String         @id @default(cuid())
   vin          String         @unique(map: "Vehicle_vin_key")
   internalCode String         @unique(map: "Vehicle_internalCode_key")
   brand        String
@@ -116,11 +132,13 @@ model vehicle {
   color        String
   year         Int
   createdAt    DateTime       @default(now())
-  vehicleentry vehicleentry[]
+  vehicleentry VehicleEntry[]
+
+  @@map("vehicle")
 }
 
-model vehicleentry {
-  id             String        @id
+model VehicleEntry {
+  id             String        @id @default(cuid())
   vehicleId      String
   employeeId     String
   serviceId      String
@@ -130,15 +148,17 @@ model vehicleentry {
   notes          String?
   createdAt      DateTime      @default(now())
   finalNotes     String?
-  entryupdate    entryupdate[]
-  photo          photo[]
-  employee       employee      @relation(fields: [employeeId], references: [id], map: "VehicleEntry_employeeId_fkey")
-  service        service       @relation(fields: [serviceId], references: [id], map: "VehicleEntry_serviceId_fkey")
-  vehicle        vehicle       @relation(fields: [vehicleId], references: [id], map: "VehicleEntry_vehicleId_fkey")
+  updates        EntryUpdate[]
+  photos         Photo[]
+  employee       Employee      @relation(fields: [employeeId], references: [id], map: "VehicleEntry_employeeId_fkey")
+  service        Service       @relation(fields: [serviceId], references: [id], map: "VehicleEntry_serviceId_fkey")
+  vehicle        Vehicle       @relation(fields: [vehicleId], references: [id], map: "VehicleEntry_vehicleId_fkey")
 
   @@index([arrivalDate], map: "VehicleEntry_arrivalDate_idx")
   @@index([employeeId], map: "VehicleEntry_employeeId_idx")
   @@index([serviceId], map: "VehicleEntry_serviceId_fkey")
   @@index([status], map: "VehicleEntry_status_idx")
   @@index([vehicleId], map: "VehicleEntry_vehicleId_idx")
+
+  @@map("vehicleentry")
 }

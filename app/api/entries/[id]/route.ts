@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+export const runtime = 'nodejs'
 
 async function savePhotoToPublic(raw: string): Promise<string | null> {
   if (typeof raw !== "string" || raw.length === 0) return null

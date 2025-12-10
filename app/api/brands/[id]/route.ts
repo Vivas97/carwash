@@ -3,9 +3,11 @@ import { prisma } from "@/lib/prisma"
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params?: { id?: string } }
 ) {
-  const { id } = params
+  const url = new URL(req.url)
+  const id = params?.id || url.pathname.split('/').pop() || undefined
+  if (!id) return NextResponse.json({ error: "Identificador requerido" }, { status: 400 })
   const body = await req.json()
   const data: any = {}
   if (typeof body.name === "string") data.name = body.name
@@ -16,10 +18,11 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params?: { id?: string } }
 ) {
-  const { id } = params
+  const url = new URL(_req.url)
+  const id = params?.id || url.pathname.split('/').pop() || undefined
+  if (!id) return NextResponse.json({ error: "Identificador requerido" }, { status: 400 })
   await prisma.brand.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
-

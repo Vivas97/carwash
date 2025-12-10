@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-  const body = await req.json()
+  let body: any = {}
+  try { body = await req.json() } catch {}
   const { vin, internalCode, brand, model, color, year } = body || {}
   if (!vin || !internalCode || !brand || !model || !color || !year) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 })

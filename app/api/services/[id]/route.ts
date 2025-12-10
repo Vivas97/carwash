@@ -29,8 +29,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function DELETE(_req: Request, { params }: { params?: { id?: string } }) {
+  const url = new URL(_req.url)
+  const id = params?.id || url.pathname.split('/').pop() || undefined
+  if (!id) return NextResponse.json({ error: "Identificador requerido" }, { status: 400 })
   await prisma.service.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }

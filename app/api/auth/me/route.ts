@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { cookies } from "next/headers"
+export const runtime = 'nodejs'
 
 export async function GET() {
   const store = await cookies()
